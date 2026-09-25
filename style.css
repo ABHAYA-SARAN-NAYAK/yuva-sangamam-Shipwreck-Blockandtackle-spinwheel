@@ -136,11 +136,12 @@ html, body {
 
 .header-event-label {
   font-family: 'Oswald', sans-serif;
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 20px;
   letter-spacing: 3px;
-  color: var(--gold);
+  color: var(--gold-light);
   text-transform: uppercase;
+  text-shadow: 0 0 15px var(--gold-glow);
 }
 
 .header-college {
@@ -177,6 +178,19 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-credits {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(245, 241, 232, 0.9);
+  background: rgba(232, 169, 59, 0.1);
+  border: 1px solid var(--glass-border);
+  padding: 6px 14px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .header-segment-toggle {
@@ -217,13 +231,15 @@ html, body {
   background: rgba(232, 169, 59, 0.08);
 }
 
-/* ═══════════════════════════════════════════════════════════
-   MAIN STAGE
-   ═══════════════════════════════════════════════════════════ */
 #stage {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 50px;
   height: calc(100vh - 72px);
   position: relative;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* ── Ambient background glow ── */
@@ -231,18 +247,18 @@ html, body {
   content: '';
   position: absolute;
   top: 50%;
-  left: 30%;
-  width: 800px;
-  height: 800px;
+  left: 50%;
+  width: 900px;
+  height: 900px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(232,169,59,0.08) 0%, rgba(90,30,30,0.06) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(232,169,59,0.1) 0%, rgba(90,30,30,0.06) 40%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* ── WHEEL AREA (left ~58%) ── */
+/* ── WHEEL AREA ── */
 #wheel-area {
-  flex: 0 0 58%;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -379,10 +395,10 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   SYNC PANEL (right ~42%)
+   SYNC PANEL
    ═══════════════════════════════════════════════════════════ */
 #sync-panel {
-  flex: 0 0 42%;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
