@@ -270,20 +270,20 @@ function drawWheel(rotationDeg) {
     ctx.rotate(midAngle);
 
     // Number tag near outer edge of slice
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    ctx.shadowBlur = 7;
     ctx.fillStyle = '#FFE082';
-    ctx.font = 'bold 20px "Oswald", sans-serif';
+    ctx.font = 'bold 24px "Oswald", sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(i + 1), sliceRadius - 10, 0);
 
-    // Movie name written vertically (radially along the slice, BOLD)
+    // Movie name written vertically (radially along the slice, BOLD & BIGGER)
     const movieText = ch.movie.toUpperCase();
-    const movieDisplay = movieText.length > 18 ? movieText.substring(0, 16) + '…' : movieText;
+    const movieDisplay = movieText.length > 17 ? movieText.substring(0, 15) + '…' : movieText;
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 16px "Oswald", sans-serif';
-    ctx.fillText(movieDisplay, sliceRadius - 44, 0);
+    ctx.font = 'bold 20px "Oswald", sans-serif';
+    ctx.fillText(movieDisplay, sliceRadius - 46, 0);
 
     ctx.restore();
 
