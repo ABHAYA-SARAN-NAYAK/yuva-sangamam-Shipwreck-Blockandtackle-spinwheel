@@ -1,0 +1,703 @@
+/* ═══════════════════════════════════════════════════════════
+   WHEEL OF RAJINIKANTH — Core Application Logic
+   
+   Architecture:
+   1. Pre-select winner → compute target angle → animate wheel
+   2. Every rAF frame: read rotation → derive segment under pointer
+      → update sync panel (fast flicker → slow → stop)
+   3. On land: reveal popup + confetti + sound
+   ═══════════════════════════════════════════════════════════ */
+
+// ── DATA ──
+const CHARACTERS = [
+  { id: 1, movie: "Jailer", character: "Muthuvel Pandian / Tiger Muthuvel Pandian", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354281/Jailer_cw8eon.png" },
+  { id: 2, movie: "Petta", character: "Kaali / Petta Velan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354279/Petta_terbuo.png" },
+  { id: 3, movie: "Kaala", character: "Karikalan (Kaala)", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354279/Kaala_qp54gp.png" },
+  { id: 4, movie: "Kabali", character: "Kabaleeswaran", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354278/Kabali_ibxa9w.png" },
+  { id: 5, movie: "Enthiran", character: "Dr. Vaseegaran / Chitti", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354277/Enthiran_qrg8lz.png" },
+  { id: 6, movie: "Sivaji", character: "Sivaji Arumugam / M.G.R.", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354278/Sivaji_vifcw4.png" },
+  { id: 7, movie: "Chandramukhi", character: "Dr. Saravanan / Vettaiyan Raja", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/Chandramukhi_upffp6.png" },
+  { id: 8, movie: "Padayappa", character: "Aarupadayappa", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/Padayappa_qaeemr.png" },
+  { id: 9, movie: "Arunachalam", character: "Arunachalam", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354274/Arunachalam_wajtn6.png" },
+  { id: 10, movie: "Muthu", character: "Muthu / Zamindar Ayya", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Muthu_qaztx8.png" },
+  { id: 11, movie: "Baasha", character: "Manickam / Manick Baasha", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Baasha_lgdxze.png" },
+  { id: 12, movie: "Ejamaan", character: "Vaanavarayan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Ejamaan_n4oubr.png" },
+  { id: 13, movie: "Annamalai", character: "Annamalai", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Annamalai_a8a4ic.png" },
+  { id: 14, movie: "Thalapathi", character: "Surya", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354278/Thalapathi_m92scj.png" },
+  { id: 15, movie: "Dharmathin Thalaivan", character: "Prof. Balu Subramaniam / Shankar", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354277/Dharmathin_Thalaivan_mou50w.png" },
+  { id: 16, movie: "Baba", character: "Baba", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354275/Baba_bvz72r.png" },
+  { id: 17, movie: "Kochadaiiyaan", character: "Kochadaiiyaan / Rana / Seena", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/Kochadaiiyaan_va9mzs.png" },
+  { id: 18, movie: "Lingaa", character: "Raja Lingeswaran / Lingaa", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354275/Lingaa_xob3m6.png" },
+  { id: 19, movie: "2.0", character: "Dr. Vaseegaran / Chitti", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/2.0_qxp9wt.png" },
+  { id: 20, movie: "Darbar", character: "Aaditya Arunachalam", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Darbar_bjvavf.png" },
+  { id: 21, movie: "Annaatthe", character: "Kaalaiyan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Annaatthe_rswjfg.png" },
+  { id: 22, movie: "Padikkadavan", character: "Raja (Rajendran)", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354279/Padikkadavan_hayf1m.png" },
+  { id: 23, movie: "Vettaiyan", character: "S. P. Athiyan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Vettaiyan_xvauh7.png" },
+  { id: 24, movie: "Coolie", character: "Deva", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354272/Coolie_y0dbji.png" },
+  { id: 25, movie: "Billa", character: "Billa / Rajappa", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Billa_drgar5.png" }
+];
+
+// ── STATE ──
+let availablePool = [...CHARACTERS];      // characters still in play
+let revealedCount = 0;
+let isSpinning = false;
+let currentRotation = 0;                   // cumulative wheel rotation in degrees
+let isMuted = false;
+let currentSegment = "SHIPWRECK";          // active segment name
+let lastPanelIndex = -1;                   // last segment index displayed in panel
+
+// ── DOM REFS ──
+const $ = (id) => document.getElementById(id);
+const canvas        = $('wheel-canvas');
+const ctx           = canvas.getContext('2d');
+const spinBtn       = $('spin-btn');
+const panelImage    = $('panel-image');
+const panelChar     = $('panel-character');
+const panelMovie    = $('panel-movie');
+const panelFrame    = $('panel-image-frame');
+const revealOverlay = $('reveal-overlay');
+const revealImage   = $('reveal-image');
+const revealChar    = $('reveal-character');
+const revealMovie   = $('reveal-movie');
+const revealCloseBtn= $('reveal-close-btn');
+const endOverlay    = $('end-overlay');
+const endResetBtn   = $('end-reset-btn');
+const pointerAssembly = $('pointer-assembly');
+const muteBtn       = $('mute-btn');
+const segBadge      = $('segment-badge');
+const segToggle     = $('segment-toggle');
+const confettiCanvas= $('confetti-canvas');
+const confettiCtx   = confettiCanvas.getContext('2d');
+const loaderBar     = $('loader-bar-fill');
+const loaderProg    = $('loader-progress');
+const loadingScreen = $('loading-screen');
+const appEl         = $('app');
+const revealedCountEl = $('revealed-count');
+const totalCountEl  = $('total-count');
+
+// ── WHEEL DRAWING CONFIG ──
+const SEGMENT_COLORS = ['#5A1E1E', '#8C6A1F', '#1A1A1E'];
+const SEGMENT_ANGLE  = (2 * Math.PI) / 25;
+const CANVAS_SIZE    = 700;                // internal canvas px
+const CENTER         = CANVAS_SIZE / 2;
+const RADIUS         = (CANVAS_SIZE / 2) - 10;
+
+// ── AUDIO (Web Audio API — generated procedurally, no external files) ──
+let audioCtx = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function playTick() {
+  if (isMuted) return;
+  try {
+    const ctx = ensureAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1800 + Math.random() * 400, ctx.currentTime);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.06);
+  } catch(e) {}
+}
+
+function playFanfare() {
+  if (isMuted) return;
+  try {
+    const ctx = ensureAudioCtx();
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
+      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + i * 0.12 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.5);
+    });
+  } catch(e) {}
+}
+
+// ── Whoosh / wind loop during spin ──
+let whooshNode = null;
+let whooshGain = null;
+
+function startWhoosh() {
+  if (isMuted) return;
+  try {
+    const ac = ensureAudioCtx();
+    const bufferSize = ac.sampleRate * 2;
+    const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.5;
+    }
+    const source = ac.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+
+    const filter = ac.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(600, ac.currentTime);
+    filter.Q.setValueAtTime(0.8, ac.currentTime);
+
+    whooshGain = ac.createGain();
+    whooshGain.gain.setValueAtTime(0.06, ac.currentTime);
+
+    source.connect(filter);
+    filter.connect(whooshGain);
+    whooshGain.connect(ac.destination);
+    source.start();
+    whooshNode = source;
+  } catch(e) {}
+}
+
+function stopWhoosh() {
+  try {
+    if (whooshGain) {
+      const ac = ensureAudioCtx();
+      whooshGain.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.5);
+    }
+    if (whooshNode) {
+      setTimeout(() => {
+        try { whooshNode.stop(); } catch(e) {}
+        whooshNode = null;
+        whooshGain = null;
+      }, 600);
+    }
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMAGE PRELOADING
+// ═══════════════════════════════════════════════════════════
+const preloadedImages = {};   // id → Image element
+
+function preloadAllImages() {
+  return new Promise((resolve) => {
+    let loaded = 0;
+    const total = CHARACTERS.length;
+
+    CHARACTERS.forEach((ch) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = img.onerror = () => {
+        loaded++;
+        preloadedImages[ch.id] = img;
+        const pct = Math.round((loaded / total) * 100);
+        loaderBar.style.width = pct + '%';
+        loaderProg.textContent = `${loaded} / ${total} images`;
+        if (loaded === total) resolve();
+      };
+      img.src = ch.image;
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// WHEEL DRAWING (Canvas)
+// ═══════════════════════════════════════════════════════════
+function drawWheel(rotationDeg) {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  const rotRad = (rotationDeg * Math.PI) / 180;
+
+  // ── Outer ring glow ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, RADIUS + 6, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(232,169,59,0.25)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Segments ──
+  for (let i = 0; i < 25; i++) {
+    const startAngle = rotRad + i * SEGMENT_ANGLE - Math.PI / 2;
+    const endAngle   = startAngle + SEGMENT_ANGLE;
+
+    // Segment fill
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(CENTER, CENTER);
+    ctx.arc(CENTER, CENTER, RADIUS, startAngle, endAngle);
+    ctx.closePath();
+
+    const colorIndex = i % 3;
+    ctx.fillStyle = SEGMENT_COLORS[colorIndex];
+    ctx.fill();
+
+    // Segment border
+    ctx.strokeStyle = 'rgba(232,169,59,0.3)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Segment label (number + movie abbreviation) ──
+    ctx.save();
+    const midAngle = startAngle + SEGMENT_ANGLE / 2;
+    const labelR   = RADIUS * 0.72;
+    const lx = CENTER + labelR * Math.cos(midAngle);
+    const ly = CENTER + labelR * Math.sin(midAngle);
+
+    ctx.translate(lx, ly);
+    ctx.rotate(midAngle + Math.PI / 2);
+
+    // Determine which character is in this visual segment
+    // The pool might be smaller than 25 once characters are removed,
+    // but the wheel always shows the FULL original 25 for visual consistency.
+    const ch = CHARACTERS[i];
+
+    // Number
+    ctx.fillStyle = '#F2C94C';
+    ctx.font = 'bold 22px "Oswald", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), 0, -12);
+
+    // Movie name (abbreviated)
+    const movieShort = ch.movie.length > 10 ? ch.movie.substring(0, 9) + '…' : ch.movie;
+    ctx.fillStyle = 'rgba(245,241,232,0.8)';
+    ctx.font = '500 12px "Inter", sans-serif';
+    ctx.fillText(movieShort, 0, 8);
+
+    ctx.restore();
+
+    // ── Small character portrait in segment ──
+    const thumbR = RADIUS * 0.38;
+    const tx = CENTER + thumbR * Math.cos(midAngle);
+    const ty = CENTER + thumbR * Math.sin(midAngle);
+    const thumbSize = 28;
+
+    if (preloadedImages[ch.id] && preloadedImages[ch.id].complete && preloadedImages[ch.id].naturalWidth > 0) {
+      ctx.save();
+      ctx.translate(tx, ty);
+      ctx.beginPath();
+      ctx.arc(0, 0, thumbSize / 2, 0, 2 * Math.PI);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(preloadedImages[ch.id], -thumbSize / 2, -thumbSize / 2, thumbSize, thumbSize);
+      ctx.restore();
+
+      // Thumbnail border
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(tx, ty, thumbSize / 2, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(232,169,59,0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ── Center hub ──
+  ctx.save();
+  const hubGrad = ctx.createRadialGradient(CENTER, CENTER, 0, CENTER, CENTER, 45);
+  hubGrad.addColorStop(0, '#2A2218');
+  hubGrad.addColorStop(0.6, '#1A1A1E');
+  hubGrad.addColorStop(1, '#0B0B0E');
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, 44, 0, 2 * Math.PI);
+  ctx.fillStyle = hubGrad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(232,169,59,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // Center text
+  ctx.save();
+  ctx.fillStyle = '#E8A93B';
+  ctx.font = 'bold 14px "Bebas Neue", "Oswald", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('SPIN', CENTER, CENTER - 4);
+  ctx.font = '10px "Inter", sans-serif';
+  ctx.fillStyle = 'rgba(245,241,232,0.5)';
+  ctx.fillText('THE WHEEL', CENTER, CENTER + 10);
+  ctx.restore();
+
+  // ── Dim used segments (grey-out overlay) ──
+  const usedIds = new Set(CHARACTERS.map(c => c.id).filter(id => !availablePool.find(p => p.id === id)));
+  for (let i = 0; i < 25; i++) {
+    if (usedIds.has(CHARACTERS[i].id)) {
+      const startAngle = rotRad + i * SEGMENT_ANGLE - Math.PI / 2;
+      const endAngle   = startAngle + SEGMENT_ANGLE;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(CENTER, CENTER);
+      ctx.arc(CENTER, CENTER, RADIUS, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(11,11,14,0.65)';
+      ctx.fill();
+
+      // "Used" checkmark
+      const midAngle = startAngle + SEGMENT_ANGLE / 2;
+      const cr = RADIUS * 0.6;
+      const cx2 = CENTER + cr * Math.cos(midAngle);
+      const cy2 = CENTER + cr * Math.sin(midAngle);
+      ctx.fillStyle = 'rgba(232,169,59,0.4)';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✓', cx2, cy2);
+      ctx.restore();
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEGMENT-INDEX-FROM-ROTATION  
+// Given the wheel's current rotation, which ORIGINAL segment
+// index (0-24) is under the pointer (top, 12 o'clock)?
+// ═══════════════════════════════════════════════════════════
+function getSegmentIndexAtPointer(rotDeg) {
+  // The wheel is drawn starting at -90° (top). Rotation is clockwise.
+  // Segment 0 starts at the top and goes clockwise.
+  // Pointer is at top (12 o'clock).
+  // After rotating `rotDeg`, the segment under the pointer is:
+  const segAngleDeg = 360 / 25;
+  // Normalize rotation into [0, 360)
+  let norm = ((rotDeg % 360) + 360) % 360;
+  // The segment at index 0 starts at the top. Rotation shifts clockwise.
+  // So segment under pointer = floor(norm / segAngleDeg)
+  // But since the wheel rotates clockwise, the segment that "arrives" at top
+  // is actually the one from the opposite side:
+  let idx = Math.floor(norm / segAngleDeg);
+  // Reverse because clockwise rotation brings higher segments to top
+  idx = (25 - idx) % 25;
+  return idx;
+}
+
+// Given a target segment index, compute the rotation angle that places
+// the CENTER of that segment exactly under the pointer.
+function angleForSegment(segIndex) {
+  const segAngleDeg = 360 / 25;
+  // We want segment `segIndex` centered under the pointer.
+  // Center of segment i is at i * segAngleDeg + segAngleDeg/2
+  // But since rotation is reverse: angle = (25 - segIndex) * segAngleDeg + segAngleDeg/2
+  return ((25 - segIndex) % 25) * segAngleDeg + segAngleDeg / 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SPIN LOGIC
+// ═══════════════════════════════════════════════════════════
+function easeOutQuint(t) {
+  return 1 - Math.pow(1 - t, 5);
+}
+
+function triggerSpin() {
+  if (isSpinning) return;
+  if (availablePool.length === 0) {
+    showEndState();
+    return;
+  }
+
+  isSpinning = true;
+  spinBtn.disabled = true;
+  panelFrame.classList.add('spinning');
+  panelFrame.classList.remove('landed');
+  pointerAssembly.classList.add('active');
+  startWhoosh();
+
+  // 1. Pre-select winner
+  const winnerPoolIndex = Math.floor(Math.random() * availablePool.length);
+  const winner = availablePool[winnerPoolIndex];
+  const winnerOrigIndex = CHARACTERS.findIndex(c => c.id === winner.id);
+
+  // 2. Compute target rotation
+  const fullSpins = 6 + Math.floor(Math.random() * 3); // 6-8 full spins
+  const targetSegAngle = angleForSegment(winnerOrigIndex);
+  const jitter = (Math.random() - 0.5) * (360 / 25) * 0.5; // stay within segment
+  const baseRotation = currentRotation % 360;
+  const targetRotation = currentRotation + (fullSpins * 360) + ((targetSegAngle - baseRotation + 360) % 360) + jitter;
+
+  // 3. Animate
+  const duration = 5500 + Math.random() * 1500; // 5.5-7s
+  const startTime = performance.now();
+  const startRotation = currentRotation;
+  let lastTickIndex = -1;
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = easeOutQuint(t);
+
+    currentRotation = startRotation + (targetRotation - startRotation) * eased;
+    drawWheel(currentRotation);
+
+    // Sync panel: which segment is under pointer now?
+    const segIdx = getSegmentIndexAtPointer(currentRotation);
+
+    // Tick sound on segment change
+    if (segIdx !== lastTickIndex) {
+      lastTickIndex = segIdx;
+      playTick();
+
+      // Update sync panel with current segment's character
+      const currentChar = CHARACTERS[segIdx];
+      if (segIdx !== lastPanelIndex) {
+        lastPanelIndex = segIdx;
+        panelChar.textContent = currentChar.character;
+        panelMovie.textContent = currentChar.movie;
+        if (preloadedImages[currentChar.id] && preloadedImages[currentChar.id].naturalWidth > 0) {
+          panelImage.src = currentChar.image;
+          panelImage.alt = currentChar.character;
+        } else {
+          panelImage.src = '';
+          panelImage.alt = currentChar.character;
+        }
+      }
+    }
+
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      // 4. Land exactly
+      currentRotation = targetRotation;
+      drawWheel(currentRotation);
+      pointerAssembly.classList.remove('active');
+      stopWhoosh();
+
+      // Snap panel to winner
+      panelChar.textContent = winner.character;
+      panelMovie.textContent = winner.movie;
+      panelImage.src = winner.image;
+      panelImage.alt = winner.character;
+      panelFrame.classList.remove('spinning');
+      panelFrame.classList.add('landed');
+      lastPanelIndex = winnerOrigIndex;
+
+      // 5. Reveal after short pause
+      setTimeout(() => {
+        showReveal(winner, winnerPoolIndex);
+      }, 600);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+// ═══════════════════════════════════════════════════════════
+// REVEAL POPUP
+// ═══════════════════════════════════════════════════════════
+function showReveal(winner, poolIndex) {
+  revealChar.textContent = winner.character;
+  revealMovie.textContent = winner.movie;
+  revealImage.src = winner.image;
+  revealImage.alt = winner.character;
+  revealOverlay.classList.remove('hidden');
+
+  playFanfare();
+  launchConfetti();
+
+  // Remove from pool
+  availablePool.splice(poolIndex, 1);
+  revealedCount++;
+  revealedCountEl.textContent = revealedCount;
+
+  // Redraw wheel to dim used segment
+  drawWheel(currentRotation);
+}
+
+function closeReveal() {
+  revealOverlay.classList.add('hidden');
+  isSpinning = false;
+  panelFrame.classList.remove('landed');
+
+  if (availablePool.length === 0) {
+    setTimeout(() => showEndState(), 300);
+  } else {
+    spinBtn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// END STATE
+// ═══════════════════════════════════════════════════════════
+function showEndState() {
+  endOverlay.classList.remove('hidden');
+  launchConfetti();
+}
+
+function resetGame() {
+  availablePool = [...CHARACTERS];
+  revealedCount = 0;
+  revealedCountEl.textContent = '0';
+  currentRotation = 0;
+  lastPanelIndex = -1;
+  isSpinning = false;
+  endOverlay.classList.add('hidden');
+  revealOverlay.classList.add('hidden');
+  panelChar.textContent = '—';
+  panelMovie.textContent = 'Spin the wheel to begin';
+  panelImage.src = '';
+  panelFrame.classList.remove('spinning', 'landed');
+  spinBtn.disabled = false;
+  drawWheel(0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONFETTI (lightweight custom implementation)
+// ═══════════════════════════════════════════════════════════
+let confettiPieces = [];
+let confettiAnimating = false;
+
+function resizeConfetti() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+
+function launchConfetti() {
+  resizeConfetti();
+  confettiPieces = [];
+
+  const colors = ['#E8A93B', '#F2C94C', '#5A1E1E', '#8C6A1F', '#F5F1E8', '#FF6B35', '#C8102E'];
+  const count = 180;
+
+  for (let i = 0; i < count; i++) {
+    confettiPieces.push({
+      x: confettiCanvas.width / 2 + (Math.random() - 0.5) * 200,
+      y: confettiCanvas.height / 2 - 100,
+      w: 6 + Math.random() * 8,
+      h: 4 + Math.random() * 6,
+      vx: (Math.random() - 0.5) * 18,
+      vy: -8 - Math.random() * 14,
+      rot: Math.random() * 360,
+      rotV: (Math.random() - 0.5) * 15,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      gravity: 0.18 + Math.random() * 0.08,
+      life: 1,
+      decay: 0.003 + Math.random() * 0.004
+    });
+  }
+
+  if (!confettiAnimating) {
+    confettiAnimating = true;
+    animateConfetti();
+  }
+}
+
+function animateConfetti() {
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+  let alive = false;
+  confettiPieces.forEach(p => {
+    if (p.life <= 0) return;
+    alive = true;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += p.gravity;
+    p.vx *= 0.99;
+    p.rot += p.rotV;
+    p.life -= p.decay;
+
+    confettiCtx.save();
+    confettiCtx.translate(p.x, p.y);
+    confettiCtx.rotate((p.rot * Math.PI) / 180);
+    confettiCtx.globalAlpha = Math.max(0, p.life);
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    confettiCtx.restore();
+  });
+
+  if (alive) {
+    requestAnimationFrame(animateConfetti);
+  } else {
+    confettiAnimating = false;
+    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// EVENT SEGMENT TOGGLE (Shipwreck ↔ Block and Tackle)
+// ═══════════════════════════════════════════════════════════
+function toggleSegment() {
+  if (currentSegment === 'SHIPWRECK') {
+    currentSegment = 'BLOCK & TACKLE';
+  } else {
+    currentSegment = 'SHIPWRECK';
+  }
+  segBadge.textContent = currentSegment;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MUTE TOGGLE
+// ═══════════════════════════════════════════════════════════
+function toggleMute() {
+  isMuted = !isMuted;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+}
+
+// ═══════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.key === ' ') {
+    e.preventDefault();
+    if (!spinBtn.disabled && !isSpinning) {
+      triggerSpin();
+    }
+  }
+  if (e.key === 'm' || e.key === 'M') {
+    toggleMute();
+  }
+  if (e.key === 'Escape') {
+    if (!revealOverlay.classList.contains('hidden')) {
+      closeReveal();
+    }
+  }
+  if (e.key === 'Enter') {
+    if (!revealOverlay.classList.contains('hidden')) {
+      closeReveal();
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+async function init() {
+  totalCountEl.textContent = CHARACTERS.length;
+
+  // Preload images
+  await preloadAllImages();
+
+  // Small delay for smooth transition
+  await new Promise(r => setTimeout(r, 400));
+
+  // Hide loader, show app
+  loadingScreen.classList.add('hidden');
+  appEl.classList.remove('hidden');
+
+  // Initial wheel draw
+  drawWheel(0);
+
+  // Enable spin
+  spinBtn.disabled = false;
+
+  // Bind events
+  spinBtn.addEventListener('click', triggerSpin);
+  revealCloseBtn.addEventListener('click', closeReveal);
+  endResetBtn.addEventListener('click', resetGame);
+  segToggle.addEventListener('click', toggleSegment);
+  muteBtn.addEventListener('click', toggleMute);
+
+  // Resize confetti canvas
+  window.addEventListener('resize', resizeConfetti);
+  resizeConfetti();
+}
+
+// Start
+init();

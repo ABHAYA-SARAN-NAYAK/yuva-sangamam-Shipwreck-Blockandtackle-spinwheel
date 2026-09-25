@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920">
+  <title>Wheel of Rajinikanth — Yuva Rajini-fied Sangamam</title>
+  <meta name="description" content="Interactive spin wheel celebrating 51 years of Rajinikanth — Shipwreck & Block and Tackle, A.M. Jain College Intra Collegiate Culturals">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════ LOADING SCREEN ═══════════════ -->
+  <div id="loading-screen">
+    <div class="loader-content">
+      <div class="loader-ring"></div>
+      <h1 class="loader-title">WHEEL OF RAJINIKANTH</h1>
+      <p class="loader-subtitle">Loading the legend...</p>
+      <div class="loader-bar-track">
+        <div class="loader-bar-fill" id="loader-bar-fill"></div>
+      </div>
+      <p class="loader-progress" id="loader-progress">0 / 25 images</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MAIN APP ═══════════════ -->
+  <div id="app" class="hidden">
+
+    <!-- ── HEADER ── -->
+    <header id="event-header">
+      <div class="header-left">
+        <span class="header-event-label">YUVA RAJINI-FIED SANGAMAM</span>
+        <span class="header-college">A.M. Jain College — Intra Collegiate Culturals</span>
+      </div>
+      <div class="header-center">
+        <h1 class="header-title">WHEEL OF RAJINIKANTH</h1>
+        <p class="header-subtitle">Celebrating 51 Years of Superstar</p>
+      </div>
+      <div class="header-right">
+        <span class="header-segment-badge" id="segment-badge">SHIPWRECK</span>
+        <button class="header-segment-toggle" id="segment-toggle" title="Switch segment">⇄</button>
+        <button class="mute-btn" id="mute-btn" title="Toggle sound">🔊</button>
+      </div>
+    </header>
+
+    <!-- ── MAIN STAGE ── -->
+    <main id="stage">
+      <!-- LEFT: WHEEL AREA -->
+      <section id="wheel-area">
+        <div class="wheel-glow"></div>
+        <div id="wheel-container">
+          <div id="pointer-assembly">
+            <div class="pointer-arrow"></div>
+          </div>
+          <canvas id="wheel-canvas" width="700" height="700"></canvas>
+        </div>
+
+        <!-- SPIN BUTTON -->
+        <button id="spin-btn" disabled>
+          <span class="spin-btn-text">SPIN</span>
+          <span class="spin-btn-hint">or press SPACEBAR</span>
+        </button>
+
+        <!-- PROGRESS COUNTER -->
+        <div class="progress-counter" id="progress-counter">
+          <span id="revealed-count">0</span> / <span id="total-count">25</span> revealed
+        </div>
+      </section>
+
+      <!-- RIGHT: SYNC PANEL -->
+      <section id="sync-panel">
+        <div class="panel-glass">
+          <div class="panel-label">NOW SELECTING</div>
+          <div class="panel-image-frame" id="panel-image-frame">
+            <img id="panel-image" src="" alt="">
+            <div class="panel-image-overlay" id="panel-image-overlay"></div>
+          </div>
+          <div class="panel-info">
+            <h2 class="panel-character" id="panel-character">—</h2>
+            <p class="panel-movie" id="panel-movie">Spin the wheel to begin</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ═══════════════ REVEAL MODAL ═══════════════ -->
+  <div id="reveal-overlay" class="hidden">
+    <div id="reveal-modal">
+      <div class="reveal-burst"></div>
+      <div class="reveal-card">
+        <div class="reveal-image-frame">
+          <img id="reveal-image" src="" alt="">
+        </div>
+        <div class="reveal-info">
+          <p class="reveal-label">THE WHEEL HAS SPOKEN</p>
+          <h2 class="reveal-character" id="reveal-character"></h2>
+          <p class="reveal-movie" id="reveal-movie"></p>
+        </div>
+        <button class="reveal-close-btn" id="reveal-close-btn">CONTINUE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ END STATE ═══════════════ -->
+  <div id="end-overlay" class="hidden">
+    <div id="end-card">
+      <h1 class="end-title">🎬 That's All 25 Legends! 🎬</h1>
+      <p class="end-subtitle">Every iconic character has been revealed.</p>
+      <button class="end-reset-btn" id="end-reset-btn">RESET & PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ CONFETTI CANVAS ═══════════════ -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
