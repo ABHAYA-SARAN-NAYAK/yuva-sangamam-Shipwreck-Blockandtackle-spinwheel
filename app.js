@@ -78,9 +78,9 @@ const totalCountEl  = $('total-count');
 // ── WHEEL DRAWING CONFIG ──
 const SEGMENT_COLORS = ['#5A1E1E', '#8C6A1F', '#1A1A1E'];
 const SEGMENT_ANGLE  = (2 * Math.PI) / 25;
-const CANVAS_SIZE    = 700;                // internal canvas px
-const CENTER         = CANVAS_SIZE / 2;
-const RADIUS         = (CANVAS_SIZE / 2) - 10;
+const CANVAS_SIZE    = 900;                // internal canvas px
+const CENTER         = CANVAS_SIZE / 2;    // 450
+const RADIUS         = (CANVAS_SIZE / 2) - 12; // 438
 
 // ── AUDIO (Web Audio API — generated procedurally, no external files) ──
 let audioCtx = null;
@@ -212,73 +212,86 @@ function preloadAllImages() {
 function drawWheel(rotationDeg) {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   const rotRad = (rotationDeg * Math.PI) / 180;
+  const sliceRadius = RADIUS - 16; // Slices fit inside outer metallic rim
 
-  // ── Outer ring glow ──
+  // ── Outer Ring Glow ──
   ctx.save();
   ctx.beginPath();
-  ctx.arc(CENTER, CENTER, RADIUS + 6, 0, 2 * Math.PI);
-  ctx.strokeStyle = 'rgba(232,169,59,0.25)';
-  ctx.lineWidth = 3;
+  ctx.arc(CENTER, CENTER, RADIUS + 14, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+  ctx.lineWidth = 6;
+  ctx.shadowColor = '#FFE082';
+  ctx.shadowBlur = 20;
   ctx.stroke();
   ctx.restore();
 
-  // ── Segments ──
+  // ── Segments (Slice Fills) ──
   for (let i = 0; i < 25; i++) {
     const startAngle = rotRad + i * SEGMENT_ANGLE - Math.PI / 2;
     const endAngle   = startAngle + SEGMENT_ANGLE;
 
-    // Segment fill
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(CENTER, CENTER);
-    ctx.arc(CENTER, CENTER, RADIUS, startAngle, endAngle);
+    ctx.arc(CENTER, CENTER, sliceRadius, startAngle, endAngle);
     ctx.closePath();
 
     const colorIndex = i % 3;
-    ctx.fillStyle = SEGMENT_COLORS[colorIndex];
+    const sliceGrad = ctx.createRadialGradient(CENTER, CENTER, 40, CENTER, CENTER, sliceRadius);
+    if (colorIndex === 0) { // Rich Crimson Red
+      sliceGrad.addColorStop(0, '#D32F2F');
+      sliceGrad.addColorStop(0.7, '#880E4F');
+      sliceGrad.addColorStop(1, '#4A0007');
+    } else if (colorIndex === 1) { // Radiant Golden Yellow
+      sliceGrad.addColorStop(0, '#FFF176');
+      sliceGrad.addColorStop(0.6, '#F57F17');
+      sliceGrad.addColorStop(1, '#8C5000');
+    } else { // Obsidian Dark Violet
+      sliceGrad.addColorStop(0, '#424254');
+      sliceGrad.addColorStop(0.7, '#21212B');
+      sliceGrad.addColorStop(1, '#0D0D12');
+    }
+
+    ctx.fillStyle = sliceGrad;
     ctx.fill();
 
     // Segment border
-    ctx.strokeStyle = 'rgba(232,169,59,0.3)';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
+    ctx.lineWidth = 1.8;
     ctx.stroke();
     ctx.restore();
 
-    // ── Segment label (number + movie abbreviation) ──
+    // ── Segment label (Vertical & Bold movie name + number along slice radius) ──
     ctx.save();
     const midAngle = startAngle + SEGMENT_ANGLE / 2;
-    const labelR   = RADIUS * 0.72;
-    const lx = CENTER + labelR * Math.cos(midAngle);
-    const ly = CENTER + labelR * Math.sin(midAngle);
-
-    ctx.translate(lx, ly);
-    ctx.rotate(midAngle + Math.PI / 2);
-
-    // Determine which character is in this visual segment
-    // The pool might be smaller than 25 once characters are removed,
-    // but the wheel always shows the FULL original 25 for visual consistency.
     const ch = CHARACTERS[i];
 
-    // Number
-    ctx.fillStyle = '#F2C94C';
-    ctx.font = 'bold 22px "Oswald", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(i + 1), 0, -12);
+    ctx.translate(CENTER, CENTER);
+    ctx.rotate(midAngle);
 
-    // Movie name (abbreviated)
-    const movieShort = ch.movie.length > 10 ? ch.movie.substring(0, 9) + '…' : ch.movie;
-    ctx.fillStyle = 'rgba(245,241,232,0.8)';
-    ctx.font = '500 12px "Inter", sans-serif';
-    ctx.fillText(movieShort, 0, 8);
+    // Number tag near outer edge of slice
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#FFE082';
+    ctx.font = 'bold 20px "Oswald", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), sliceRadius - 10, 0);
+
+    // Movie name written vertically (radially along the slice, BOLD)
+    const movieText = ch.movie.toUpperCase();
+    const movieDisplay = movieText.length > 18 ? movieText.substring(0, 16) + '…' : movieText;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px "Oswald", sans-serif';
+    ctx.fillText(movieDisplay, sliceRadius - 44, 0);
 
     ctx.restore();
 
     // ── Small character portrait in segment ──
-    const thumbR = RADIUS * 0.38;
+    const thumbR = sliceRadius * 0.32;
     const tx = CENTER + thumbR * Math.cos(midAngle);
     const ty = CENTER + thumbR * Math.sin(midAngle);
-    const thumbSize = 28;
+    const thumbSize = 34;
 
     if (preloadedImages[ch.id] && preloadedImages[ch.id].complete && preloadedImages[ch.id].naturalWidth > 0) {
       ctx.save();
@@ -294,38 +307,98 @@ function drawWheel(rotationDeg) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(tx, ty, thumbSize / 2, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(232,169,59,0.4)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
     }
   }
 
-  // ── Center hub ──
+  // ── Outer Metallic Golden Rim Ring ──
   ctx.save();
-  const hubGrad = ctx.createRadialGradient(CENTER, CENTER, 0, CENTER, CENTER, 45);
-  hubGrad.addColorStop(0, '#2A2218');
-  hubGrad.addColorStop(0.6, '#1A1A1E');
+  const rimGrad = ctx.createRadialGradient(CENTER, CENTER, sliceRadius, CENTER, CENTER, RADIUS + 10);
+  rimGrad.addColorStop(0, '#5C4000');
+  rimGrad.addColorStop(0.3, '#FFD54F');
+  rimGrad.addColorStop(0.6, '#FFB300');
+  rimGrad.addColorStop(0.85, '#FFF8E1');
+  rimGrad.addColorStop(1, '#3E2723');
+
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, RADIUS + 10, 0, 2 * Math.PI, false);
+  ctx.arc(CENTER, CENTER, sliceRadius, 0, 2 * Math.PI, true);
+  ctx.closePath();
+  ctx.fillStyle = rimGrad;
+  ctx.fill();
+
+  ctx.strokeStyle = '#FFE082';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── 50 Embedded LED Border Lights on the Rim ──
+  const totalBulbs = 50;
+  const bulbRadius = RADIUS - 3;
+  const timeTick = Math.floor(performance.now() / 200);
+
+  for (let b = 0; b < totalBulbs; b++) {
+    const bulbAngle = rotRad + b * ((2 * Math.PI) / totalBulbs);
+    const bx = CENTER + bulbRadius * Math.cos(bulbAngle);
+    const by = CENTER + bulbRadius * Math.sin(bulbAngle);
+    const isLit = (b + timeTick) % 2 === 0;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(bx, by, 5.5, 0, 2 * Math.PI);
+
+    if (isLit) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '#FFF59D';
+      ctx.shadowBlur = 14;
+    } else {
+      ctx.fillStyle = '#FFC107';
+      ctx.shadowColor = '#FF8F00';
+      ctx.shadowBlur = 7;
+    }
+    ctx.fill();
+
+    // Inner bright bulb point
+    ctx.beginPath();
+    ctx.arc(bx, by, 2.5, 0, 2 * Math.PI);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Center Hub ──
+  ctx.save();
+  const hubGrad = ctx.createRadialGradient(CENTER, CENTER, 0, CENTER, CENTER, 58);
+  hubGrad.addColorStop(0, '#3E2723');
+  hubGrad.addColorStop(0.5, '#1A1A1E');
   hubGrad.addColorStop(1, '#0B0B0E');
   ctx.beginPath();
-  ctx.arc(CENTER, CENTER, 44, 0, 2 * Math.PI);
+  ctx.arc(CENTER, CENTER, 56, 0, 2 * Math.PI);
   ctx.fillStyle = hubGrad;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(232,169,59,0.5)';
-  ctx.lineWidth = 2;
+
+  ctx.strokeStyle = '#FFD54F';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = '#FFE082';
+  ctx.shadowBlur = 10;
   ctx.stroke();
   ctx.restore();
 
   // Center text
   ctx.save();
-  ctx.fillStyle = '#E8A93B';
-  ctx.font = 'bold 14px "Bebas Neue", "Oswald", sans-serif';
+  ctx.shadowColor = '#FF8F00';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#FFD54F';
+  ctx.font = 'bold 20px "Bebas Neue", "Oswald", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('SPIN', CENTER, CENTER - 4);
-  ctx.font = '10px "Inter", sans-serif';
-  ctx.fillStyle = 'rgba(245,241,232,0.5)';
-  ctx.fillText('THE WHEEL', CENTER, CENTER + 10);
+  ctx.fillText('SPIN', CENTER, CENTER - 5);
+  ctx.font = 'bold 11px "Inter", sans-serif';
+  ctx.fillStyle = 'rgba(255, 248, 225, 0.85)';
+  ctx.fillText('THE WHEEL', CENTER, CENTER + 12);
   ctx.restore();
 
   // ── Dim used segments (grey-out overlay) ──
@@ -337,18 +410,18 @@ function drawWheel(rotationDeg) {
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(CENTER, CENTER);
-      ctx.arc(CENTER, CENTER, RADIUS, startAngle, endAngle);
+      ctx.arc(CENTER, CENTER, sliceRadius, startAngle, endAngle);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(11,11,14,0.65)';
+      ctx.fillStyle = 'rgba(11, 11, 14, 0.72)';
       ctx.fill();
 
       // "Used" checkmark
       const midAngle = startAngle + SEGMENT_ANGLE / 2;
-      const cr = RADIUS * 0.6;
+      const cr = sliceRadius * 0.65;
       const cx2 = CENTER + cr * Math.cos(midAngle);
       const cy2 = CENTER + cr * Math.sin(midAngle);
-      ctx.fillStyle = 'rgba(232,169,59,0.4)';
-      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = '#FFD54F';
+      ctx.font = 'bold 24px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('✓', cx2, cy2);
@@ -360,34 +433,27 @@ function drawWheel(rotationDeg) {
 // ═══════════════════════════════════════════════════════════
 // SEGMENT-INDEX-FROM-ROTATION  
 // Given the wheel's current rotation, which ORIGINAL segment
-// index (0-24) is under the pointer (top, 12 o'clock)?
+// index (0-24) is under the top pointer (12 o'clock)?
 // ═══════════════════════════════════════════════════════════
 function getSegmentIndexAtPointer(rotDeg) {
-  // The wheel is drawn starting at -90° (top). Rotation is clockwise.
-  // Segment 0 starts at the top and goes clockwise.
-  // Pointer is at top (12 o'clock).
-  // After rotating `rotDeg`, the segment under the pointer is:
   const segAngleDeg = 360 / 25;
   // Normalize rotation into [0, 360)
-  let norm = ((rotDeg % 360) + 360) % 360;
-  // The segment at index 0 starts at the top. Rotation shifts clockwise.
-  // So segment under pointer = floor(norm / segAngleDeg)
-  // But since the wheel rotates clockwise, the segment that "arrives" at top
-  // is actually the one from the opposite side:
-  let idx = Math.floor(norm / segAngleDeg);
-  // Reverse because clockwise rotation brings higher segments to top
-  idx = (25 - idx) % 25;
+  const norm = ((rotDeg % 360) + 360) % 360;
+  // Clockwise rotation R brings segment i to top when:
+  // -90° + i * 14.4° + R = -90° => i * 14.4° = 360° - R
+  const angleFromStart = (360 - norm) % 360;
+  const idx = Math.floor(angleFromStart / segAngleDeg) % 25;
   return idx;
 }
 
 // Given a target segment index, compute the rotation angle that places
-// the CENTER of that segment exactly under the pointer.
+// the CENTER of that segment exactly under the top pointer (12 o'clock).
 function angleForSegment(segIndex) {
   const segAngleDeg = 360 / 25;
-  // We want segment `segIndex` centered under the pointer.
-  // Center of segment i is at i * segAngleDeg + segAngleDeg/2
-  // But since rotation is reverse: angle = (25 - segIndex) * segAngleDeg + segAngleDeg/2
-  return ((25 - segIndex) % 25) * segAngleDeg + segAngleDeg / 2;
+  // Center of segment segIndex is at segIndex * 14.4° + 7.2°.
+  // To center it under top pointer at rotation R: R = 360° - (segIndex * 14.4° + 7.2°)
+  const target = 360 - (segIndex * segAngleDeg + segAngleDeg / 2);
+  return ((target % 360) + 360) % 360;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -666,6 +732,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// IDLE LED LIGHT ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════
+function startIdleLightLoop() {
+  function loop() {
+    if (!isSpinning) {
+      drawWheel(currentRotation);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
 async function init() {
@@ -683,6 +762,9 @@ async function init() {
 
   // Initial wheel draw
   drawWheel(0);
+
+  // Start LED light animation loop
+  startIdleLightLoop();
 
   // Enable spin
   spinBtn.disabled = false;
