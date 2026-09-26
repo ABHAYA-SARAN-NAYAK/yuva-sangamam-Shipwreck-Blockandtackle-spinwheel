@@ -71,15 +71,29 @@
       <!-- RIGHT: SYNC PANEL -->
       <section id="sync-panel">
         <div class="panel-glass">
-          <div class="panel-label">NOW SELECTING</div>
-          <div class="panel-image-frame" id="panel-image-frame">
-            <img id="panel-image" src="" alt="">
-            <div class="panel-image-overlay" id="panel-image-overlay"></div>
+          <div class="panel-label" id="panel-label">NOW SELECTING</div>
+
+          <!-- WHILE SPINNING / INITIAL: LARGE NUMBER DISPLAY ONLY -->
+          <div id="panel-spinning-view" class="panel-spinning-view">
+            <div class="panel-number-box">
+              <span id="panel-spin-number">?</span>
+            </div>
           </div>
-          <div class="panel-info">
-            <h2 class="panel-character" id="panel-character">—</h2>
-            <p class="panel-movie" id="panel-movie">Spin the wheel to begin</p>
+
+          <!-- ON LANDING: REVEAL SHARED IMAGE + CHARACTER NAME + MOVIE -->
+          <div id="panel-landed-view" class="panel-landed-view hidden">
+            <div class="panel-image-frame" id="panel-image-frame">
+              <img id="panel-image" src="" alt="">
+              <div class="panel-image-overlay" id="panel-image-overlay"></div>
+            </div>
+            <div class="panel-info">
+              <span class="panel-win-badge" id="panel-win-badge"></span>
+              <h2 class="panel-character" id="panel-character"></h2>
+              <p class="panel-movie" id="panel-movie"></p>
+            </div>
+            <button class="panel-continue-btn" id="panel-continue-btn">CONTINUE</button>
           </div>
+
         </div>
       </section>
     </main>
@@ -90,6 +104,7 @@
     <div id="reveal-modal">
       <div class="reveal-burst"></div>
       <div class="reveal-card">
+        <span class="reveal-num-badge" id="reveal-num-badge">#1</span>
         <div class="reveal-image-frame">
           <img id="reveal-image" src="" alt="">
         </div>

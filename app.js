@@ -2,39 +2,42 @@
    WHEEL OF RAJINIKANTH — Core Application Logic
    
    Architecture:
-   1. Pre-select winner → compute target angle → animate wheel
-   2. Every rAF frame: read rotation → derive segment under pointer
-      → update sync panel (fast flicker → slow → stop)
-   3. On land: reveal popup + confetti + sound
+   1. Segments: Numbers 1-25 only on alternating gold/maroon/black backgrounds
+   2. Sync Panel during spin: Displays real-time segment number only
+   3. Sync Panel on landing: Reveals shared image + character name + movie title
+   4. Spin Animation: GPU-accelerated CSS transform rotate for 60fps smoothness
    ═══════════════════════════════════════════════════════════ */
 
-// ── DATA ──
+// ── CONSTANTS ──
+const SHARED_IMAGE_URL = "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790426049/ChatGPT_Image_Sep_26_2026_06_00_29_PM_kdfa4d.png";
+
+// ── DATA (25 Characters) ──
 const CHARACTERS = [
-  { id: 1, movie: "Jailer", character: "Muthuvel Pandian / Tiger Muthuvel Pandian", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354281/Jailer_cw8eon.png" },
-  { id: 2, movie: "Petta", character: "Kaali / Petta Velan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354279/Petta_terbuo.png" },
-  { id: 3, movie: "Kaala", character: "Karikalan (Kaala)", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354279/Kaala_qp54gp.png" },
-  { id: 4, movie: "Kabali", character: "Kabaleeswaran", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354278/Kabali_ibxa9w.png" },
-  { id: 5, movie: "Enthiran", character: "Dr. Vaseegaran / Chitti", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354277/Enthiran_qrg8lz.png" },
-  { id: 6, movie: "Sivaji", character: "Sivaji Arumugam / M.G.R.", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354278/Sivaji_vifcw4.png" },
-  { id: 7, movie: "Chandramukhi", character: "Dr. Saravanan / Vettaiyan Raja", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/Chandramukhi_upffp6.png" },
-  { id: 8, movie: "Padayappa", character: "Aarupadayappa", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/Padayappa_qaeemr.png" },
-  { id: 9, movie: "Arunachalam", character: "Arunachalam", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354274/Arunachalam_wajtn6.png" },
-  { id: 10, movie: "Muthu", character: "Muthu / Zamindar Ayya", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Muthu_qaztx8.png" },
-  { id: 11, movie: "Baasha", character: "Manickam / Manick Baasha", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Baasha_lgdxze.png" },
-  { id: 12, movie: "Ejamaan", character: "Vaanavarayan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Ejamaan_n4oubr.png" },
-  { id: 13, movie: "Annamalai", character: "Annamalai", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Annamalai_a8a4ic.png" },
-  { id: 14, movie: "Thalapathi", character: "Surya", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354278/Thalapathi_m92scj.png" },
-  { id: 15, movie: "Dharmathin Thalaivan", character: "Prof. Balu Subramaniam / Shankar", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354277/Dharmathin_Thalaivan_mou50w.png" },
-  { id: 16, movie: "Baba", character: "Baba", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354275/Baba_bvz72r.png" },
-  { id: 17, movie: "Kochadaiiyaan", character: "Kochadaiiyaan / Rana / Seena", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/Kochadaiiyaan_va9mzs.png" },
-  { id: 18, movie: "Lingaa", character: "Raja Lingeswaran / Lingaa", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354275/Lingaa_xob3m6.png" },
-  { id: 19, movie: "2.0", character: "Dr. Vaseegaran / Chitti", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354276/2.0_qxp9wt.png" },
-  { id: 20, movie: "Darbar", character: "Aaditya Arunachalam", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Darbar_bjvavf.png" },
-  { id: 21, movie: "Annaatthe", character: "Kaalaiyan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354273/Annaatthe_rswjfg.png" },
-  { id: 22, movie: "Padikkadavan", character: "Raja (Rajendran)", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354279/Padikkadavan_hayf1m.png" },
-  { id: 23, movie: "Vettaiyan", character: "S. P. Athiyan", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Vettaiyan_xvauh7.png" },
-  { id: 24, movie: "Coolie", character: "Deva", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354272/Coolie_y0dbji.png" },
-  { id: 25, movie: "Billa", character: "Billa / Rajappa", image: "https://res.cloudinary.com/dkht5j3tw/image/upload/v1790354271/Billa_drgar5.png" }
+  { id: 1, movie: "Jailer", character: "Muthuvel Pandian / Tiger Muthuvel Pandian" },
+  { id: 2, movie: "Petta", character: "Kaali / Petta Velan" },
+  { id: 3, movie: "Kaala", character: "Karikalan (Kaala)" },
+  { id: 4, movie: "Kabali", character: "Kabaleeswaran" },
+  { id: 5, movie: "Enthiran", character: "Dr. Vaseegaran / Chitti" },
+  { id: 6, movie: "Sivaji", character: "Sivaji Arumugam / M.G.R." },
+  { id: 7, movie: "Chandramukhi", character: "Dr. Saravanan / Vettaiyan Raja" },
+  { id: 8, movie: "Padayappa", character: "Aarupadayappa" },
+  { id: 9, movie: "Arunachalam", character: "Arunachalam" },
+  { id: 10, movie: "Muthu", character: "Muthu / Zamindar Ayya" },
+  { id: 11, movie: "Baasha", character: "Manickam / Manick Baasha" },
+  { id: 12, movie: "Ejamaan", character: "Vaanavarayan" },
+  { id: 13, movie: "Annamalai", character: "Annamalai" },
+  { id: 14, movie: "Thalapathi", character: "Surya" },
+  { id: 15, movie: "Dharmathin Thalaivan", character: "Prof. Balu Subramaniam / Shankar" },
+  { id: 16, movie: "Baba", character: "Baba" },
+  { id: 17, movie: "Kochadaiiyaan", character: "Kochadaiiyaan / Rana / Seena" },
+  { id: 18, movie: "Lingaa", character: "Raja Lingeswaran / Lingaa" },
+  { id: 19, movie: "2.0", character: "Dr. Vaseegaran / Chitti" },
+  { id: 20, movie: "Darbar", character: "Aaditya Arunachalam" },
+  { id: 21, movie: "Annaatthe", character: "Kaalaiyan" },
+  { id: 22, movie: "Padikkadavan", character: "Raja (Rajendran)" },
+  { id: 23, movie: "Vettaiyan", character: "S. P. Athiyan" },
+  { id: 24, movie: "Coolie", character: "Deva" },
+  { id: 25, movie: "Billa", character: "Billa / Rajappa" }
 ];
 
 // ── STATE ──
@@ -48,41 +51,47 @@ let lastPanelIndex = -1;                   // last segment index displayed in pa
 
 // ── DOM REFS ──
 const $ = (id) => document.getElementById(id);
-const canvas        = $('wheel-canvas');
-const ctx           = canvas.getContext('2d');
-const spinBtn       = $('spin-btn');
-const panelImage    = $('panel-image');
-const panelChar     = $('panel-character');
-const panelMovie    = $('panel-movie');
-const panelFrame    = $('panel-image-frame');
-const revealOverlay = $('reveal-overlay');
-const revealImage   = $('reveal-image');
-const revealChar    = $('reveal-character');
-const revealMovie   = $('reveal-movie');
-const revealCloseBtn= $('reveal-close-btn');
-const endOverlay    = $('end-overlay');
-const endResetBtn   = $('end-reset-btn');
+const canvas          = $('wheel-canvas');
+const ctx             = canvas.getContext('2d');
+const spinBtn         = $('spin-btn');
+const panelLabel      = $('panel-label');
+const panelSpinView   = $('panel-spinning-view');
+const panelSpinNumber = $('panel-spin-number');
+const panelLandedView   = $('panel-landed-view');
+const panelWinBadge     = $('panel-win-badge');
+const panelImage        = $('panel-image');
+const panelChar         = $('panel-character');
+const panelMovie        = $('panel-movie');
+const panelFrame        = $('panel-image-frame');
+const panelContinueBtn  = $('panel-continue-btn');
+const revealOverlay     = $('reveal-overlay');
+const revealImage     = $('reveal-image');
+const revealChar      = $('reveal-character');
+const revealMovie     = $('reveal-movie');
+const revealNumBadge  = $('reveal-num-badge');
+const revealCloseBtn  = $('reveal-close-btn');
+const endOverlay      = $('end-overlay');
+const endResetBtn     = $('end-reset-btn');
 const pointerAssembly = $('pointer-assembly');
-const muteBtn       = $('mute-btn');
-const segBadge      = $('segment-badge');
-const segToggle     = $('segment-toggle');
-const confettiCanvas= $('confetti-canvas');
-const confettiCtx   = confettiCanvas.getContext('2d');
-const loaderBar     = $('loader-bar-fill');
-const loaderProg    = $('loader-progress');
-const loadingScreen = $('loading-screen');
-const appEl         = $('app');
+const muteBtn         = $('mute-btn');
+const segBadge        = $('segment-badge');
+const segToggle       = $('segment-toggle');
+const confettiCanvas  = $('confetti-canvas');
+const confettiCtx     = confettiCanvas.getContext('2d');
+const loaderBar       = $('loader-bar-fill');
+const loaderProg      = $('loader-progress');
+const loadingScreen   = $('loading-screen');
+const appEl           = $('app');
 const revealedCountEl = $('revealed-count');
-const totalCountEl  = $('total-count');
+const totalCountEl    = $('total-count');
 
 // ── WHEEL DRAWING CONFIG ──
-const SEGMENT_COLORS = ['#5A1E1E', '#8C6A1F', '#1A1A1E'];
 const SEGMENT_ANGLE  = (2 * Math.PI) / 25;
 const CANVAS_SIZE    = 900;                // internal canvas px
 const CENTER         = CANVAS_SIZE / 2;    // 450
 const RADIUS         = (CANVAS_SIZE / 2) - 12; // 438
 
-// ── AUDIO (Web Audio API — generated procedurally, no external files) ──
+// ── AUDIO (Web Audio API — generated procedurally) ──
 let audioCtx = null;
 
 function ensureAudioCtx() {
@@ -95,42 +104,42 @@ function ensureAudioCtx() {
 function playTick() {
   if (isMuted) return;
   try {
-    const ctx = ensureAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const ac = ensureAudioCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1800 + Math.random() * 400, ctx.currentTime);
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+    osc.frequency.setValueAtTime(1800 + Math.random() * 400, ac.currentTime);
+    gain.gain.setValueAtTime(0.08, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.05);
     osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.06);
+    gain.connect(ac.destination);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.05);
   } catch(e) {}
 }
 
 function playFanfare() {
   if (isMuted) return;
   try {
-    const ctx = ensureAudioCtx();
+    const ac = ensureAudioCtx();
     const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
     notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
-      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + i * 0.12 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
+      osc.frequency.setValueAtTime(freq, ac.currentTime + i * 0.12);
+      gain.gain.setValueAtTime(0, ac.currentTime + i * 0.12);
+      gain.gain.linearRampToValueAtTime(0.15, ac.currentTime + i * 0.12 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.12 + 0.5);
       osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.12);
-      osc.stop(ctx.currentTime + i * 0.12 + 0.5);
+      gain.connect(ac.destination);
+      osc.start(ac.currentTime + i * 0.12);
+      osc.stop(ac.currentTime + i * 0.12 + 0.5);
     });
   } catch(e) {}
 }
 
-// ── Whoosh / wind loop during spin ──
+// Whoosh sound during spin
 let whooshNode = null;
 let whooshGain = null;
 
@@ -168,51 +177,43 @@ function stopWhoosh() {
   try {
     if (whooshGain) {
       const ac = ensureAudioCtx();
-      whooshGain.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.5);
+      whooshGain.gain.linearRampToValueAtTime(0.001, ac.currentTime + 0.4);
     }
     if (whooshNode) {
       setTimeout(() => {
         try { whooshNode.stop(); } catch(e) {}
         whooshNode = null;
         whooshGain = null;
-      }, 600);
+      }, 500);
     }
   } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════════════════
-// IMAGE PRELOADING
+// ASSET PRELOADING (Single shared reveal image preloaded at start)
 // ═══════════════════════════════════════════════════════════
-const preloadedImages = {};   // id → Image element
+let sharedRevealImage = null;
 
-function preloadAllImages() {
+function preloadSharedImage() {
   return new Promise((resolve) => {
-    let loaded = 0;
-    const total = CHARACTERS.length;
-
-    CHARACTERS.forEach((ch) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = img.onerror = () => {
-        loaded++;
-        preloadedImages[ch.id] = img;
-        const pct = Math.round((loaded / total) * 100);
-        loaderBar.style.width = pct + '%';
-        loaderProg.textContent = `${loaded} / ${total} images`;
-        if (loaded === total) resolve();
-      };
-      img.src = ch.image;
-    });
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = img.onerror = () => {
+      sharedRevealImage = img;
+      loaderBar.style.width = '100%';
+      loaderProg.textContent = '1 / 1 image ready';
+      resolve();
+    };
+    img.src = SHARED_IMAGE_URL;
   });
 }
 
 // ═══════════════════════════════════════════════════════════
-// WHEEL DRAWING (Canvas)
+// WHEEL DRAWING (Static Canvas Texture)
 // ═══════════════════════════════════════════════════════════
-function drawWheel(rotationDeg) {
+function drawWheel() {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-  const rotRad = (rotationDeg * Math.PI) / 180;
-  const sliceRadius = RADIUS - 16; // Slices fit inside outer metallic rim
+  const sliceRadius = RADIUS - 16;
 
   // ── Outer Ring Glow ──
   ctx.save();
@@ -225,9 +226,9 @@ function drawWheel(rotationDeg) {
   ctx.stroke();
   ctx.restore();
 
-  // ── Segments (Slice Fills) ──
+  // ── 25 Segments (Plain colored backgrounds with numbers only) ──
   for (let i = 0; i < 25; i++) {
-    const startAngle = rotRad + i * SEGMENT_ANGLE - Math.PI / 2;
+    const startAngle = i * SEGMENT_ANGLE - Math.PI / 2;
     const endAngle   = startAngle + SEGMENT_ANGLE;
 
     ctx.save();
@@ -255,63 +256,28 @@ function drawWheel(rotationDeg) {
     ctx.fillStyle = sliceGrad;
     ctx.fill();
 
-    // Segment border
+    // Segment border lines
     ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
     ctx.lineWidth = 1.8;
     ctx.stroke();
     ctx.restore();
 
-    // ── Segment label (Vertical & Bold movie name + number along slice radius) ──
+    // ── Segment Label: Large centered number (1–25) ONLY ──
     ctx.save();
     const midAngle = startAngle + SEGMENT_ANGLE / 2;
-    const ch = CHARACTERS[i];
 
     ctx.translate(CENTER, CENTER);
     ctx.rotate(midAngle);
 
-    // Number tag near outer edge of slice
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-    ctx.shadowBlur = 7;
-    ctx.fillStyle = '#FFE082';
-    ctx.font = 'bold 24px "Oswald", sans-serif';
-    ctx.textAlign = 'right';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = colorIndex === 1 ? '#FFFFFF' : '#FFE082';
+    ctx.font = 'bold 36px "Oswald", "Bebas Neue", sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(i + 1), sliceRadius - 10, 0);
-
-    // Movie name written vertically (radially along the slice, BOLD & BIGGER)
-    const movieText = ch.movie.toUpperCase();
-    const movieDisplay = movieText.length > 17 ? movieText.substring(0, 15) + '…' : movieText;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 20px "Oswald", sans-serif';
-    ctx.fillText(movieDisplay, sliceRadius - 46, 0);
+    ctx.fillText(String(i + 1), sliceRadius * 0.6, 0);
 
     ctx.restore();
-
-    // ── Small character portrait in segment ──
-    const thumbR = sliceRadius * 0.32;
-    const tx = CENTER + thumbR * Math.cos(midAngle);
-    const ty = CENTER + thumbR * Math.sin(midAngle);
-    const thumbSize = 34;
-
-    if (preloadedImages[ch.id] && preloadedImages[ch.id].complete && preloadedImages[ch.id].naturalWidth > 0) {
-      ctx.save();
-      ctx.translate(tx, ty);
-      ctx.beginPath();
-      ctx.arc(0, 0, thumbSize / 2, 0, 2 * Math.PI);
-      ctx.closePath();
-      ctx.clip();
-      ctx.drawImage(preloadedImages[ch.id], -thumbSize / 2, -thumbSize / 2, thumbSize, thumbSize);
-      ctx.restore();
-
-      // Thumbnail border
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(tx, ty, thumbSize / 2, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 
   // ── Outer Metallic Golden Rim Ring ──
@@ -341,7 +307,7 @@ function drawWheel(rotationDeg) {
   const timeTick = Math.floor(performance.now() / 200);
 
   for (let b = 0; b < totalBulbs; b++) {
-    const bulbAngle = rotRad + b * ((2 * Math.PI) / totalBulbs);
+    const bulbAngle = b * ((2 * Math.PI) / totalBulbs);
     const bx = CENTER + bulbRadius * Math.cos(bulbAngle);
     const by = CENTER + bulbRadius * Math.sin(bulbAngle);
     const isLit = (b + timeTick) % 2 === 0;
@@ -361,7 +327,6 @@ function drawWheel(rotationDeg) {
     }
     ctx.fill();
 
-    // Inner bright bulb point
     ctx.beginPath();
     ctx.arc(bx, by, 2.5, 0, 2 * Math.PI);
     ctx.fillStyle = '#FFFFFF';
@@ -404,24 +369,24 @@ function drawWheel(rotationDeg) {
   // ── Dim used segments (grey-out overlay) ──
   const usedIds = new Set(CHARACTERS.map(c => c.id).filter(id => !availablePool.find(p => p.id === id)));
   for (let i = 0; i < 25; i++) {
-    if (usedIds.has(CHARACTERS[i].id)) {
-      const startAngle = rotRad + i * SEGMENT_ANGLE - Math.PI / 2;
+    if (usedIds.has(i + 1)) {
+      const startAngle = i * SEGMENT_ANGLE - Math.PI / 2;
       const endAngle   = startAngle + SEGMENT_ANGLE;
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(CENTER, CENTER);
       ctx.arc(CENTER, CENTER, sliceRadius, startAngle, endAngle);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(11, 11, 14, 0.72)';
+      ctx.fillStyle = 'rgba(11, 11, 14, 0.75)';
       ctx.fill();
 
       // "Used" checkmark
       const midAngle = startAngle + SEGMENT_ANGLE / 2;
-      const cr = sliceRadius * 0.65;
+      const cr = sliceRadius * 0.6;
       const cx2 = CENTER + cr * Math.cos(midAngle);
       const cy2 = CENTER + cr * Math.sin(midAngle);
       ctx.fillStyle = '#FFD54F';
-      ctx.font = 'bold 24px sans-serif';
+      ctx.font = 'bold 28px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('✓', cx2, cy2);
@@ -431,38 +396,31 @@ function drawWheel(rotationDeg) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SEGMENT-INDEX-FROM-ROTATION  
-// Given the wheel's current rotation, which ORIGINAL segment
-// index (0-24) is under the top pointer (12 o'clock)?
+// POINTER CALCULATION
 // ═══════════════════════════════════════════════════════════
 function getSegmentIndexAtPointer(rotDeg) {
-  const segAngleDeg = 360 / 25;
-  // Normalize rotation into [0, 360)
   const norm = ((rotDeg % 360) + 360) % 360;
-  // Clockwise rotation R brings segment i to top when:
-  // -90° + i * 14.4° + R = -90° => i * 14.4° = 360° - R
   const angleFromStart = (360 - norm) % 360;
-  const idx = Math.floor(angleFromStart / segAngleDeg) % 25;
-  return idx;
+  return Math.floor(angleFromStart / 14.4) % 25;
 }
 
-// Given a target segment index, compute the rotation angle that places
-// the CENTER of that segment exactly under the top pointer (12 o'clock).
 function angleForSegment(segIndex) {
   const segAngleDeg = 360 / 25;
-  // Center of segment segIndex is at segIndex * 14.4° + 7.2°.
-  // To center it under top pointer at rotation R: R = 360° - (segIndex * 14.4° + 7.2°)
   const target = 360 - (segIndex * segAngleDeg + segAngleDeg / 2);
   return ((target % 360) + 360) % 360;
 }
 
 // ═══════════════════════════════════════════════════════════
-// SPIN LOGIC
+// EASING CURVE
+// Single continuous cubic-bezier / quintic ease for smooth spin
 // ═══════════════════════════════════════════════════════════
 function easeOutQuint(t) {
   return 1 - Math.pow(1 - t, 5);
 }
 
+// ═══════════════════════════════════════════════════════════
+// SPIN LOGIC (GPU Accelerated transform: rotate)
+// ═══════════════════════════════════════════════════════════
 function triggerSpin() {
   if (isSpinning) return;
   if (availablePool.length === 0) {
@@ -472,8 +430,13 @@ function triggerSpin() {
 
   isSpinning = true;
   spinBtn.disabled = true;
-  panelFrame.classList.add('spinning');
-  panelFrame.classList.remove('landed');
+
+  // Reset sync panel to spinning view (number only)
+  panelLandedView.classList.add('hidden');
+  panelLandedView.classList.remove('landed-anim');
+  panelSpinView.classList.remove('hidden');
+  if (panelLabel) panelLabel.textContent = 'NOW SELECTING';
+
   pointerAssembly.classList.add('active');
   startWhoosh();
 
@@ -485,12 +448,12 @@ function triggerSpin() {
   // 2. Compute target rotation
   const fullSpins = 6 + Math.floor(Math.random() * 3); // 6-8 full spins
   const targetSegAngle = angleForSegment(winnerOrigIndex);
-  const jitter = (Math.random() - 0.5) * (360 / 25) * 0.5; // stay within segment
+  const jitter = (Math.random() - 0.5) * (360 / 25) * 0.4; // stay centered within segment
   const baseRotation = currentRotation % 360;
   const targetRotation = currentRotation + (fullSpins * 360) + ((targetSegAngle - baseRotation + 360) % 360) + jitter;
 
-  // 3. Animate
-  const duration = 5500 + Math.random() * 1500; // 5.5-7s
+  // 3. Animate over continuous duration
+  const duration = 5500 + Math.random() * 1000; // 5.5-6.5s
   const startTime = performance.now();
   const startRotation = currentRotation;
   let lastTickIndex = -1;
@@ -501,51 +464,37 @@ function triggerSpin() {
     const eased = easeOutQuint(t);
 
     currentRotation = startRotation + (targetRotation - startRotation) * eased;
-    drawWheel(currentRotation);
 
-    // Sync panel: which segment is under pointer now?
+    // GPU accelerated layer rotation (zero layout re-render)
+    canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+    // Calculate segment under top pointer
     const segIdx = getSegmentIndexAtPointer(currentRotation);
 
-    // Tick sound on segment change
+    // ONLY update panel DOM when segment number actually changes (prevents DOM lag)
     if (segIdx !== lastTickIndex) {
       lastTickIndex = segIdx;
       playTick();
 
-      // Update sync panel with current segment's character
-      const currentChar = CHARACTERS[segIdx];
       if (segIdx !== lastPanelIndex) {
         lastPanelIndex = segIdx;
-        panelChar.textContent = currentChar.character;
-        panelMovie.textContent = currentChar.movie;
-        if (preloadedImages[currentChar.id] && preloadedImages[currentChar.id].naturalWidth > 0) {
-          panelImage.src = currentChar.image;
-          panelImage.alt = currentChar.character;
-        } else {
-          panelImage.src = '';
-          panelImage.alt = currentChar.character;
-        }
+        panelSpinNumber.textContent = segIdx + 1;
       }
     }
 
     if (t < 1) {
       requestAnimationFrame(animate);
     } else {
-      // 4. Land exactly
+      // 4. Landed
       currentRotation = targetRotation;
-      drawWheel(currentRotation);
+      canvas.style.transform = `rotate(${currentRotation}deg)`;
       pointerAssembly.classList.remove('active');
       stopWhoosh();
 
-      // Snap panel to winner
-      panelChar.textContent = winner.character;
-      panelMovie.textContent = winner.movie;
-      panelImage.src = winner.image;
-      panelImage.alt = winner.character;
-      panelFrame.classList.remove('spinning');
-      panelFrame.classList.add('landed');
-      lastPanelIndex = winnerOrigIndex;
+      // Reveal winner details in sync panel
+      revealLandedInPanel(winner);
 
-      // 5. Reveal after short pause
+      // 5. Open popup modal after brief pause
       setTimeout(() => {
         showReveal(winner, winnerPoolIndex);
       }, 600);
@@ -556,12 +505,30 @@ function triggerSpin() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// REVEAL POPUP
+// LANDED REVEAL IN SYNC PANEL
+// ═══════════════════════════════════════════════════════════
+function revealLandedInPanel(winner) {
+  panelSpinView.classList.add('hidden');
+
+  if (panelLabel) panelLabel.textContent = 'SELECTED LEGEND';
+  if (panelWinBadge) panelWinBadge.textContent = `#${winner.id}`;
+  panelChar.textContent = winner.character;
+  panelMovie.textContent = winner.movie;
+  panelImage.src = SHARED_IMAGE_URL;
+  panelImage.alt = winner.character;
+
+  panelLandedView.classList.remove('hidden');
+  panelLandedView.classList.add('landed-anim');
+}
+
+// ═══════════════════════════════════════════════════════════
+// REVEAL MODAL
 // ═══════════════════════════════════════════════════════════
 function showReveal(winner, poolIndex) {
+  if (revealNumBadge) revealNumBadge.textContent = `#${winner.id}`;
   revealChar.textContent = winner.character;
   revealMovie.textContent = winner.movie;
-  revealImage.src = winner.image;
+  revealImage.src = SHARED_IMAGE_URL;
   revealImage.alt = winner.character;
   revealOverlay.classList.remove('hidden');
 
@@ -573,20 +540,38 @@ function showReveal(winner, poolIndex) {
   revealedCount++;
   revealedCountEl.textContent = revealedCount;
 
-  // Redraw wheel to dim used segment
-  drawWheel(currentRotation);
+  // Redraw wheel once to dim newly used segment
+  drawWheel();
 }
 
-function closeReveal() {
+function resetPanelToIdle() {
   revealOverlay.classList.add('hidden');
   isSpinning = false;
-  panelFrame.classList.remove('landed');
+
+  // Reset panel completely back to idle state with placeholder '?'
+  panelLandedView.classList.add('hidden');
+  panelLandedView.classList.remove('landed-anim');
+  panelSpinView.classList.remove('hidden');
+
+  if (panelLabel) panelLabel.textContent = 'NOW SELECTING';
+  if (panelSpinNumber) panelSpinNumber.textContent = '?';
+
+  // Completely clear landed state (no leftover image or character info)
+  panelImage.src = '';
+  panelImage.alt = '';
+  panelChar.textContent = '';
+  panelMovie.textContent = '';
+  if (panelWinBadge) panelWinBadge.textContent = '';
 
   if (availablePool.length === 0) {
     setTimeout(() => showEndState(), 300);
   } else {
     spinBtn.disabled = false;
   }
+}
+
+function closeReveal() {
+  resetPanelToIdle();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -604,18 +589,17 @@ function resetGame() {
   currentRotation = 0;
   lastPanelIndex = -1;
   isSpinning = false;
+  canvas.style.transform = 'rotate(0deg)';
+
   endOverlay.classList.add('hidden');
   revealOverlay.classList.add('hidden');
-  panelChar.textContent = '—';
-  panelMovie.textContent = 'Spin the wheel to begin';
-  panelImage.src = '';
-  panelFrame.classList.remove('spinning', 'landed');
-  spinBtn.disabled = false;
-  drawWheel(0);
+
+  resetPanelToIdle();
+  drawWheel();
 }
 
 // ═══════════════════════════════════════════════════════════
-// CONFETTI (lightweight custom implementation)
+// CONFETTI
 // ═══════════════════════════════════════════════════════════
 let confettiPieces = [];
 let confettiAnimating = false;
@@ -687,7 +671,7 @@ function animateConfetti() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// EVENT SEGMENT TOGGLE (Shipwreck ↔ Block and Tackle)
+// EVENT SEGMENT TOGGLE
 // ═══════════════════════════════════════════════════════════
 function toggleSegment() {
   if (currentSegment === 'SHIPWRECK') {
@@ -732,12 +716,14 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// IDLE LED LIGHT ANIMATION LOOP
+// IDLE LIGHT LOOP (Throttled for zero CPU draw during spin)
 // ═══════════════════════════════════════════════════════════
 function startIdleLightLoop() {
-  function loop() {
-    if (!isSpinning) {
-      drawWheel(currentRotation);
+  let lastTime = 0;
+  function loop(now) {
+    if (!isSpinning && now - lastTime > 200) {
+      lastTime = now;
+      drawWheel();
     }
     requestAnimationFrame(loop);
   }
@@ -750,33 +736,29 @@ function startIdleLightLoop() {
 async function init() {
   totalCountEl.textContent = CHARACTERS.length;
 
-  // Preload images
-  await preloadAllImages();
+  // Preload single shared reveal image
+  await preloadSharedImage();
 
-  // Small delay for smooth transition
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 200));
 
-  // Hide loader, show app
   loadingScreen.classList.add('hidden');
   appEl.classList.remove('hidden');
 
   // Initial wheel draw
-  drawWheel(0);
+  drawWheel();
+  canvas.style.transform = 'rotate(0deg)';
 
-  // Start LED light animation loop
   startIdleLightLoop();
 
-  // Enable spin
   spinBtn.disabled = false;
 
-  // Bind events
   spinBtn.addEventListener('click', triggerSpin);
+  panelContinueBtn.addEventListener('click', resetPanelToIdle);
   revealCloseBtn.addEventListener('click', closeReveal);
   endResetBtn.addEventListener('click', resetGame);
   segToggle.addEventListener('click', toggleSegment);
   muteBtn.addEventListener('click', toggleMute);
 
-  // Resize confetti canvas
   window.addEventListener('resize', resizeConfetti);
   resizeConfetti();
 }
